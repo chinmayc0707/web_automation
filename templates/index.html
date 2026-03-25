@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama ChatGPT Clone</title>
+
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- DOMPurify for sanitizing HTML -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
+    <!-- KaTeX for LaTeX rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
+
+    <style>
+        .message-content p {
+            margin-bottom: 0.5rem;
+        }
+        .message-content pre {
+            background-color: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin-bottom: 0.5rem;
+        }
+        .message-content code {
+            background-color: #f3f4f6;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col font-sans">
+
+    <!-- Header/Settings -->
+    <header class="bg-white shadow p-4 flex justify-between items-center z-10">
+        <h1 class="text-xl font-bold text-gray-800">Ollama Chat</h1>
+        <div class="flex gap-4 items-center">
+            <div class="flex flex-col">
+                <label for="host-input" class="text-xs text-gray-500">Ollama Host</label>
+                <input type="text" id="host-input" value="http://localhost:11434" class="border rounded p-1 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="flex flex-col">
+                <label for="model-select" class="text-xs text-gray-500">Model</label>
+                <select id="model-select" class="border rounded p-1 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+            <button id="refresh-models-btn" class="bg-gray-200 hover:bg-gray-300 rounded p-1 mt-4 text-sm transition">
+                Refresh
+            </button>
+        </div>
+    </header>
+
+    <!-- Chat Container -->
+    <main class="flex-1 overflow-y-auto p-4 w-full max-w-4xl mx-auto flex flex-col gap-4" id="chat-container">
+        <!-- Messages will be injected here -->
+        <div class="text-center text-gray-500 mt-10" id="welcome-message">
+            <p>Welcome! Configure your host and model, then start chatting.</p>
+        </div>
+    </main>
+
+    <!-- Input Area -->
+    <footer class="bg-white border-t p-4">
+        <div class="max-w-4xl mx-auto flex gap-2 relative">
+            <textarea id="message-input" rows="1" class="flex-1 border rounded-lg p-3 pr-12 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Type a message... (Shift+Enter for new line)"></textarea>
+            <button id="send-btn" class="absolute right-2 bottom-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-2 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                </svg>
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        const hostInput = document.getElementById('host-input');
+        const modelSelect = document.getElementById('model-select');
+        const refreshModelsBtn = document.getElementById('refresh-models-btn');
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const welcomeMessage = document.getElementById('welcome-message');
+
+        let chatHistory = [];
+        let isGenerating = false;
+
+        // Configure marked to handle math block syntax properly if needed, but we rely on KaTeX rendering
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        // Custom function to process KaTeX before Marked.js
+        function renderContent(text) {
+            // Protect math blocks from Marked.js parsing like _ and *
+            let mathBlocks = [];
+
+            // Extract block math $$...$$ or \[...\]
+            text = text.replace(/(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])/g, function(match) {
+                mathBlocks.push(match);
+                return `___MATH_BLOCK_${mathBlocks.length - 1}___`;
+            });
+
+            // Extract inline math $...$ or \\(...\\)
+            text = text.replace(/(\$(?!\$)[\s\S]*?\$|\\\([\s\S]*?\\\))/g, function(match) {
+                mathBlocks.push(match);
+                return `___MATH_INLINE_${mathBlocks.length - 1}___`;
+            });
+
+            // Render markdown
+            let rawHtml = marked.parse(text);
+
+            // Sanitize first to avoid stripping < or > in math blocks
+            let cleanHtml = DOMPurify.sanitize(rawHtml, {
+                ADD_TAGS: ["math", "mrow", "mi", "mn", "mo", "mspace", "mover", "munder", "munderover", "msup", "msub", "msubsup", "mfrac", "mroot", "msqrt", "mtable", "mtr", "mtd", "maligngroup", "malignmark", "mstyle", "merror", "mpadded", "mphantom", "mfenced", "menclose", "annotation"],
+                ADD_ATTR: ["mathvariant", "mathsize", "mathcolor", "mathbackground", "dir", "display", "xmlns", "class", "style"]
+            });
+
+            // Restore math blocks AFTER sanitization
+            cleanHtml = cleanHtml.replace(/___MATH_BLOCK_(\d+)___/g, function(match, index) {
+                return mathBlocks[parseInt(index, 10)];
+            });
+            cleanHtml = cleanHtml.replace(/___MATH_INLINE_(\d+)___/g, function(match, index) {
+                return mathBlocks[parseInt(index, 10)];
+            });
+
+            return cleanHtml;
+        }
+        async function fetchModels() {
+            const host = hostInput.value;
+            modelSelect.innerHTML = '<option value="">Loading...</option>';
+            modelSelect.disabled = true;
+
+            try {
+                const response = await fetch(`/api/tags?host=${encodeURIComponent(host)}`);
+                if (!response.ok) throw new Error('Failed to fetch models');
+
+                const data = await response.json();
+                modelSelect.innerHTML = '';
+
+                if (data.models && data.models.length > 0) {
+                    data.models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.name;
+                        option.textContent = model.name;
+                        modelSelect.appendChild(option);
+                    });
+                } else {
+                    modelSelect.innerHTML = '<option value="">No models found</option>';
+                }
+            } catch (error) {
+                console.error('Error fetching models:', error);
+                modelSelect.innerHTML = '<option value="">Error loading</option>';
+            } finally {
+                modelSelect.disabled = false;
+            }
+        }
+
+        refreshModelsBtn.addEventListener('click', fetchModels);
+
+        // Auto resize textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if (this.value.trim() === '') {
+                this.style.height = 'auto';
+            }
+        });
+
+        // Handle enter key to send
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendBtn.addEventListener('click', sendMessage);
+
+        function createMessageElement(role, content) {
+            const div = document.createElement('div');
+            div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-[80%] rounded-lg p-4 message-content ${
+                role === 'user'
+                ? 'bg-blue-500 text-white rounded-br-none'
+                : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'
+            }`;
+
+            if (role === 'user') {
+                innerDiv.textContent = content;
+            } else {
+                innerDiv.innerHTML = renderContent(content);
+                // Render math
+                renderMathInElement(innerDiv, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\(', right: '\\)', display: false},
+                        {left: '\\[', right: '\\]', display: true}
+                    ],
+                    throwOnError: false
+                });
+            }
+
+            div.appendChild(innerDiv);
+            return { container: div, contentElement: innerDiv };
+        }
+
+        async function sendMessage() {
+            const content = messageInput.value.trim();
+            if (!content || isGenerating) return;
+
+            const host = hostInput.value;
+            const model = modelSelect.value;
+
+            if (!model) {
+                alert('Please select a model first.');
+                return;
+            }
+
+            // Hide welcome message
+            if (welcomeMessage) welcomeMessage.style.display = 'none';
+
+            // Reset input
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            sendBtn.disabled = true;
+            isGenerating = true;
+
+            // Add user message to UI and history
+            const userMsgObj = { role: 'user', content };
+            chatHistory.push(userMsgObj);
+
+            const { container: userDiv } = createMessageElement('user', content);
+            chatContainer.appendChild(userDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // Create placeholder for assistant message
+            const { container: astDiv, contentElement: astContent } = createMessageElement('assistant', '...');
+            chatContainer.appendChild(astDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        host,
+                        model,
+                        messages: chatHistory
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let assistantMessage = "";
+                let buffer = "";
+                astContent.innerHTML = ""; // Clear loading text
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    buffer += chunk;
+                    let lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    lines = lines.filter(line => line.trim() !== '');
+
+                    for (const line of lines) {
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.error) {
+                                assistantMessage += `\n**Error**: ${data.error}`;
+                            } else if (data.message && data.message.content) {
+                                assistantMessage += data.message.content;
+                            }
+
+                            // Update UI incrementally
+                            astContent.innerHTML = renderContent(assistantMessage);
+                            // Need to re-render math periodically or at the end
+                            // For performance, we render math on the fly, though it might be heavy.
+                            // We can throttle it, but for simplicity we run it here.
+                            renderMathInElement(astContent, {
+                                delimiters: [
+                                    {left: '$$', right: '$$', display: true},
+                                    {left: '$', right: '$', display: false},
+                                    {left: '\\(', right: '\\)', display: false},
+                                    {left: '\\[', right: '\\]', display: true}
+                                ],
+                                throwOnError: false
+                            });
+
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        } catch (e) {
+                            console.error("Error parsing chunk:", e, line);
+                        }
+                    }
+                }
+
+                // Add final assistant message to history
+                chatHistory.push({ role: 'assistant', content: assistantMessage });
+
+            } catch (error) {
+                console.error("Chat error:", error);
+                astContent.innerHTML = `<span class="text-red-500">Error connecting to server or Ollama instance. Check if host is correct.</span>`;
+            } finally {
+                sendBtn.disabled = false;
+                isGenerating = false;
+                messageInput.focus();
+            }
+        }
+
+        // Initialize
+        fetchModels();
+    </script>
+</body>
+</html>

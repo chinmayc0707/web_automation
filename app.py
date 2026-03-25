@@ -10,12 +10,16 @@ import re
 
 def is_safe_host(url):
     try:
+        # If no scheme is provided, prepend http:// for parsing
+        if not url.startswith('http://') and not url.startswith('https://'):
+            url = 'http://' + url
+
         parsed = urllib.parse.urlparse(url)
         if not parsed.hostname:
             return False
 
-        # Allow localhost, 127.0.0.1
-        if parsed.hostname in ['localhost', '127.0.0.1']:
+        # Allow localhost, 127.0.0.1, host.docker.internal, and .local domains
+        if parsed.hostname in ['localhost', '127.0.0.1', 'host.docker.internal'] or parsed.hostname.endswith('.local'):
             return True
 
         # Allow local network ranges
@@ -28,9 +32,6 @@ def is_safe_host(url):
         return False
     except Exception:
         return False
-    except:
-        return False
-
 
 @app.route('/')
 def index():
@@ -42,8 +43,10 @@ def chat():
     if not data:
         return jsonify({"error": "No JSON payload provided"}), 400
 
-
     host = data.get('host', 'http://localhost:11434')
+    if not host.startswith('http://') and not host.startswith('https://'):
+        host = 'http://' + host
+
     if not is_safe_host(host):
         return jsonify({"error": "Invalid or unsafe host URL"}), 400
 
@@ -72,17 +75,22 @@ def chat():
 
 @app.route('/api/tags', methods=['GET'])
 def get_tags():
-
     host = request.args.get('host', 'http://localhost:11434')
+    if not host.startswith('http://') and not host.startswith('https://'):
+        host = 'http://' + host
+
     if not is_safe_host(host):
         return jsonify({"error": "Invalid or unsafe host URL"}), 400
 
     try:
-        response = requests.get(f"{host.rstrip('/')}/api/tags")
+        # Short timeout so it fails fast if not running
+        response = requests.get(f"{host.rstrip('/')}/api/tags", timeout=3)
         response.raise_for_status()
         return jsonify(response.json())
+    except requests.exceptions.ConnectionError:
+        return jsonify({"error": "Connection refused. Is Ollama running?", "models": []}), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e), "models": []}), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

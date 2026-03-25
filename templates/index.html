@@ -235,6 +235,16 @@
         let chatHistory = [];
         let isGenerating = false;
 
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+
         // Configure marked to handle math block syntax properly if needed, but we rely on KaTeX rendering
         marked.setOptions({
             breaks: true,
@@ -269,10 +279,10 @@
 
             // Restore math blocks AFTER sanitization
             cleanHtml = cleanHtml.replace(/___MATH_BLOCK_(\d+)___/g, function(match, index) {
-                return mathBlocks[parseInt(index, 10)];
+                return escapeHtml(mathBlocks[parseInt(index, 10)]);
             });
             cleanHtml = cleanHtml.replace(/___MATH_INLINE_(\d+)___/g, function(match, index) {
-                return mathBlocks[parseInt(index, 10)];
+                return escapeHtml(mathBlocks[parseInt(index, 10)]);
             });
 
             return cleanHtml;
@@ -283,14 +293,16 @@
             modelSelect.innerHTML = '<option value="" class="bg-gptdark">Loading...</option>';
             modelSelect.disabled = true;
 
-            try {
+try {
                 const response = await fetch(`/api/tags?host=${encodeURIComponent(host)}`);
                 if (!response.ok) throw new Error('Failed to fetch models');
 
                 const data = await response.json();
                 modelSelect.innerHTML = '';
 
-                if (data.models && data.models.length > 0) {
+                if (data.error) {
+                    modelSelect.innerHTML = `<option value="" class="bg-gptdark">${data.error}</option>`;
+                } else if (data.models && data.models.length > 0) {
                     data.models.forEach(model => {
                         const option = document.createElement('option');
                         option.value = model.name;
@@ -352,7 +364,7 @@
 
             if (role === 'user') {
                 div.className = `flex justify-end w-full`;
-                div.innerHTML = `<div class="user-message-content max-w-[80%] break-words">${content.replace(/\n/g, '<br>')}</div>`;
+                div.innerHTML = `<div class="user-message-content max-w-[80%] break-words">${escapeHtml(content).replace(/\n/g, '<br>')}</div>`;
                 return { container: div, contentElement: div.firstChild };
             } else {
                 div.className = `flex gap-4 w-full`;

@@ -22,6 +22,10 @@ def is_safe_host(url):
         if parsed.hostname in ['localhost', '127.0.0.1', 'host.docker.internal'] or parsed.hostname.endswith('.local'):
             return True
 
+        # Allow ngrok tunnels for testing remote Ollama instances
+        if parsed.hostname.endswith('.ngrok-free.app') or parsed.hostname.endswith('.ngrok.io') or parsed.hostname.endswith('.ngrok.app'):
+            return True
+
         # Allow local network ranges
         if parsed.hostname.startswith('192.168.') or parsed.hostname.startswith('10.'):
             return True

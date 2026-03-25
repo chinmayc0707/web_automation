@@ -7,6 +7,26 @@
 
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gptdark: '#212121',
+                        gptsidebar: '#171717',
+                        gpthover: '#2f2f2f',
+                        gptuser: '#005b41', // Darker green like the screenshot
+                        gptinput: '#2f2f2f',
+                        gpttext: '#ececec',
+                        gptmuted: '#b4b4b4'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
 
     <!-- Marked.js for Markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -20,71 +40,194 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
 
     <style>
-        .message-content p {
-            margin-bottom: 0.5rem;
+        /* Base styles */
+        body {
+            background-color: #212121;
+            color: #ececec;
+            margin: 0;
+            overflow: hidden;
         }
-        .message-content pre {
-            background-color: #f3f4f6;
+
+        /* Markdown Styles */
+        .prose p { margin-bottom: 1rem; line-height: 1.6; }
+        .prose h1, .prose h2, .prose h3 { font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .prose h1 { font-size: 1.5rem; }
+        .prose h2 { font-size: 1.25rem; }
+        .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+        .prose ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+        .prose li { margin-bottom: 0.25rem; line-height: 1.6; }
+        .prose pre {
+            background-color: #0d0d0d;
             padding: 1rem;
             border-radius: 0.5rem;
             overflow-x: auto;
-            margin-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            border: 1px solid #333;
         }
-        .message-content code {
-            background-color: #f3f4f6;
+        .prose code {
+            background-color: #333;
             padding: 0.2rem 0.4rem;
             border-radius: 0.25rem;
-            font-family: monospace;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.875rem;
+        }
+        .prose pre code {
+            background-color: transparent;
+            padding: 0;
+            border-radius: 0;
+        }
+
+        /* User message styling overrides */
+        .user-message-content {
+            background-color: #0f766e; /* A greener color like the screenshot */
+            color: white;
+            padding: 0.75rem 1.25rem;
+            border-radius: 1.5rem;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+
+        /* Focus rings */
+        input:focus, select:focus, textarea:focus {
+            outline: none;
         }
     </style>
 </head>
-<body class="bg-gray-100 h-screen flex flex-col font-sans">
+<body class="flex h-screen text-sm">
 
-    <!-- Header/Settings -->
-    <header class="bg-white shadow p-4 flex justify-between items-center z-10">
-        <h1 class="text-xl font-bold text-gray-800">Ollama Chat</h1>
-        <div class="flex gap-4 items-center">
-            <div class="flex flex-col">
-                <label for="host-input" class="text-xs text-gray-500">Ollama Host</label>
-                <input type="text" id="host-input" value="http://localhost:11434" class="border rounded p-1 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gptsidebar flex-shrink-0 flex flex-col border-r border-[#333] hidden md:flex transition-all">
+        <div class="p-3 flex items-center justify-between hover:bg-gpthover rounded-lg mx-2 mt-2 cursor-pointer transition">
+            <div class="flex items-center gap-2">
+                <div class="w-7 h-7 bg-white text-black rounded-full flex items-center justify-center font-bold text-xs">O</div>
+                <span class="font-medium text-sm">New chat</span>
             </div>
-            <div class="flex flex-col">
-                <label for="model-select" class="text-xs text-gray-500">Model</label>
-                <select id="model-select" class="border rounded p-1 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Loading...</option>
-                </select>
-            </div>
-            <button id="refresh-models-btn" class="bg-gray-200 hover:bg-gray-300 rounded p-1 mt-4 text-sm transition">
-                Refresh
-            </button>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-gptmuted">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+            </svg>
         </div>
-    </header>
 
-    <!-- Chat Container -->
-    <main class="flex-1 overflow-y-auto p-4 w-full max-w-4xl mx-auto flex flex-col gap-4" id="chat-container">
-        <!-- Messages will be injected here -->
-        <div class="text-center text-gray-500 mt-10" id="welcome-message">
-            <p>Welcome! Configure your host and model, then start chatting.</p>
+        <nav class="flex-1 overflow-y-auto mt-4 px-2 space-y-1">
+            <div class="px-3 py-2 text-xs font-semibold text-gptmuted uppercase tracking-wider">Today</div>
+            <a href="#" class="flex items-center px-3 py-2 text-sm font-medium rounded-lg hover:bg-gpthover transition truncate">
+                How does Comet do that thing
+            </a>
+
+            <div class="px-3 py-2 mt-4 text-xs font-semibold text-gptmuted uppercase tracking-wider">Previous 7 Days</div>
+            <a href="#" class="flex items-center px-3 py-2 text-sm font-medium rounded-lg hover:bg-gpthover transition truncate text-gptmuted">
+                Ollama setup guide
+            </a>
+            <a href="#" class="flex items-center px-3 py-2 text-sm font-medium rounded-lg hover:bg-gpthover transition truncate text-gptmuted">
+                Python SSRF vulnerabilities
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-[#333]">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">U</div>
+                <div class="flex flex-col">
+                    <span class="text-sm font-medium">User</span>
+                    <span class="text-xs text-gptmuted">Free Plan</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col bg-gptdark relative h-full">
+
+        <!-- Header -->
+        <header class="flex items-center justify-between p-3 sticky top-0 bg-gptdark z-10">
+            <div class="flex items-center gap-2">
+                <button class="md:hidden p-2 text-gptmuted hover:text-white rounded-md hover:bg-gpthover">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                </button>
+                <button class="flex items-center gap-2 text-lg font-semibold text-gpttext hover:bg-gpthover px-3 py-1.5 rounded-lg transition">
+                    Ollama <span class="text-gptmuted text-sm">v</span>
+                </button>
+            </div>
+
+            <!-- Flexible Host Settings disguised as top actions -->
+            <div class="flex items-center gap-3 text-sm text-gptmuted bg-gptsidebar border border-[#333] rounded-lg px-2 py-1">
+                <div class="flex items-center gap-2 border-r border-[#333] pr-2">
+                    <label for="host-input" class="text-xs hidden lg:block">Host:</label>
+                    <input type="text" id="host-input" value="http://localhost:11434" class="bg-transparent border-none text-xs w-32 focus:ring-0 text-white" placeholder="http://localhost:11434">
+                </div>
+                <div class="flex items-center gap-2 pl-1 border-r border-[#333] pr-2">
+                    <label for="model-select" class="text-xs hidden lg:block">Model:</label>
+                    <select id="model-select" class="bg-transparent border-none text-xs w-24 focus:ring-0 cursor-pointer text-white">
+                        <option value="" class="bg-gptdark">Loading...</option>
+                    </select>
+                </div>
+                <button id="refresh-models-btn" class="hover:text-white transition p-1" title="Refresh Models">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat Area -->
+        <div class="flex-1 overflow-y-auto" id="chat-container">
+            <div class="max-w-3xl mx-auto w-full pt-10 pb-32 px-4 flex flex-col gap-6">
+                <!-- Messages injected here -->
+
+                <div class="flex flex-col items-center justify-center h-[50vh] text-center" id="welcome-message">
+                    <div class="w-16 h-16 bg-white text-black rounded-full flex items-center justify-center font-bold text-3xl mb-4">O</div>
+                    <h2 class="text-2xl font-bold mb-2">How can I help you today?</h2>
+                    <p class="text-gptmuted text-sm max-w-sm">Configure your host and model above, then start typing below.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-gptdark via-gptdark to-transparent pt-6 pb-6 px-4">
+            <div class="max-w-3xl mx-auto relative">
+                <div class="relative flex items-center bg-gptinput rounded-3xl border border-[#444] shadow-[0_0_15px_rgba(0,0,0,0.1)] focus-within:border-[#666] transition">
+
+                    <button class="pl-4 text-gptmuted hover:text-white transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    </button>
+
+                    <textarea id="message-input" rows="1" class="w-full bg-transparent border-none text-gpttext placeholder-gptmuted py-4 px-3 resize-none max-h-48 overflow-y-auto" placeholder="Ask anything..."></textarea>
+
+                    <div class="flex items-center gap-2 pr-3">
+                        <button class="p-2 text-gptmuted hover:text-white transition rounded-full hover:bg-gpthover">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>
+                        </button>
+                        <button id="send-btn" class="p-2 bg-[#10a37f] text-white rounded-full hover:bg-[#0e906f] transition disabled:opacity-50 disabled:bg-gptmuted flex items-center justify-center w-8 h-8">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="text-center text-xs text-gptmuted mt-2">
+                    Ollama can make mistakes. Consider verifying important information.
+                </div>
+            </div>
         </div>
     </main>
-
-    <!-- Input Area -->
-    <footer class="bg-white border-t p-4">
-        <div class="max-w-4xl mx-auto flex gap-2 relative">
-            <textarea id="message-input" rows="1" class="flex-1 border rounded-lg p-3 pr-12 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Type a message... (Shift+Enter for new line)"></textarea>
-            <button id="send-btn" class="absolute right-2 bottom-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-2 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                </svg>
-            </button>
-        </div>
-    </footer>
 
     <script>
         const hostInput = document.getElementById('host-input');
         const modelSelect = document.getElementById('model-select');
         const refreshModelsBtn = document.getElementById('refresh-models-btn');
         const chatContainer = document.getElementById('chat-container');
+        const scrollArea = chatContainer.firstElementChild;
         const messageInput = document.getElementById('message-input');
         const sendBtn = document.getElementById('send-btn');
         const welcomeMessage = document.getElementById('welcome-message');
@@ -109,7 +252,7 @@
                 return `___MATH_BLOCK_${mathBlocks.length - 1}___`;
             });
 
-            // Extract inline math $...$ or \\(...\\)
+            // Extract inline math $...$ or \(...\)
             text = text.replace(/(\$(?!\$)[\s\S]*?\$|\\\([\s\S]*?\\\))/g, function(match) {
                 mathBlocks.push(match);
                 return `___MATH_INLINE_${mathBlocks.length - 1}___`;
@@ -134,9 +277,10 @@
 
             return cleanHtml;
         }
+
         async function fetchModels() {
             const host = hostInput.value;
-            modelSelect.innerHTML = '<option value="">Loading...</option>';
+            modelSelect.innerHTML = '<option value="" class="bg-gptdark">Loading...</option>';
             modelSelect.disabled = true;
 
             try {
@@ -151,14 +295,15 @@
                         const option = document.createElement('option');
                         option.value = model.name;
                         option.textContent = model.name;
+                        option.className = 'bg-gptdark';
                         modelSelect.appendChild(option);
                     });
                 } else {
-                    modelSelect.innerHTML = '<option value="">No models found</option>';
+                    modelSelect.innerHTML = '<option value="" class="bg-gptdark">No models found</option>';
                 }
             } catch (error) {
                 console.error('Error fetching models:', error);
-                modelSelect.innerHTML = '<option value="">Error loading</option>';
+                modelSelect.innerHTML = '<option value="" class="bg-gptdark">Error loading</option>';
             } finally {
                 modelSelect.disabled = false;
             }
@@ -169,9 +314,22 @@
         // Auto resize textarea
         messageInput.addEventListener('input', function() {
             this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
+            let newHeight = this.scrollHeight;
+            if (newHeight > 200) newHeight = 200; // max height
+            this.style.height = newHeight + 'px';
             if (this.value.trim() === '') {
                 this.style.height = 'auto';
+            }
+
+            // Toggle button state based on input
+            if (this.value.trim() !== '' && !isGenerating) {
+                sendBtn.disabled = false;
+                sendBtn.classList.remove('bg-gptmuted');
+                sendBtn.classList.add('bg-white', 'text-black');
+            } else if (!isGenerating) {
+                sendBtn.disabled = true;
+                sendBtn.classList.add('bg-gptmuted');
+                sendBtn.classList.remove('bg-white', 'text-black');
             }
         });
 
@@ -185,21 +343,28 @@
 
         sendBtn.addEventListener('click', sendMessage);
 
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
         function createMessageElement(role, content) {
             const div = document.createElement('div');
-            div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4`;
-
-            const innerDiv = document.createElement('div');
-            innerDiv.className = `max-w-[80%] rounded-lg p-4 message-content ${
-                role === 'user'
-                ? 'bg-blue-500 text-white rounded-br-none'
-                : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'
-            }`;
 
             if (role === 'user') {
-                innerDiv.textContent = content;
+                div.className = `flex justify-end w-full`;
+                div.innerHTML = `<div class="user-message-content max-w-[80%] break-words">${content.replace(/\n/g, '<br>')}</div>`;
+                return { container: div, contentElement: div.firstChild };
             } else {
+                div.className = `flex gap-4 w-full`;
+
+                const avatarDiv = document.createElement('div');
+                avatarDiv.className = 'w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold flex-shrink-0 mt-1';
+                avatarDiv.textContent = 'O';
+
+                const innerDiv = document.createElement('div');
+                innerDiv.className = `prose prose-invert max-w-none text-gpttext w-full`;
                 innerDiv.innerHTML = renderContent(content);
+
                 // Render math
                 renderMathInElement(innerDiv, {
                     delimiters: [
@@ -210,10 +375,11 @@
                     ],
                     throwOnError: false
                 });
-            }
 
-            div.appendChild(innerDiv);
-            return { container: div, contentElement: innerDiv };
+                div.appendChild(avatarDiv);
+                div.appendChild(innerDiv);
+                return { container: div, contentElement: innerDiv };
+            }
         }
 
         async function sendMessage() {
@@ -235,6 +401,13 @@
             messageInput.value = '';
             messageInput.style.height = 'auto';
             sendBtn.disabled = true;
+            sendBtn.classList.add('bg-gptmuted');
+            sendBtn.classList.remove('bg-white', 'text-black');
+
+            // Change send button icon to stop icon
+            sendBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+            sendBtn.disabled = false; // Allow clicking to stop (dummy logic for now)
+
             isGenerating = true;
 
             // Add user message to UI and history
@@ -242,13 +415,14 @@
             chatHistory.push(userMsgObj);
 
             const { container: userDiv } = createMessageElement('user', content);
-            chatContainer.appendChild(userDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            scrollArea.insertBefore(userDiv, scrollArea.lastElementChild); // Insert before the padding div
+            scrollToBottom();
 
             // Create placeholder for assistant message
-            const { container: astDiv, contentElement: astContent } = createMessageElement('assistant', '...');
-            chatContainer.appendChild(astDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            const { container: astDiv, contentElement: astContent } = createMessageElement('assistant', '●');
+            astContent.classList.add('animate-pulse');
+            scrollArea.insertBefore(astDiv, scrollArea.lastElementChild);
+            scrollToBottom();
 
             try {
                 const response = await fetch('/api/chat', {
@@ -268,6 +442,7 @@
                 let assistantMessage = "";
                 let buffer = "";
                 astContent.innerHTML = ""; // Clear loading text
+                astContent.classList.remove('animate-pulse');
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -290,9 +465,10 @@
 
                             // Update UI incrementally
                             astContent.innerHTML = renderContent(assistantMessage);
+
+                            // Highlight code blocks (basic styling via CSS already applied)
+
                             // Need to re-render math periodically or at the end
-                            // For performance, we render math on the fly, though it might be heavy.
-                            // We can throttle it, but for simplicity we run it here.
                             renderMathInElement(astContent, {
                                 delimiters: [
                                     {left: '$$', right: '$$', display: true},
@@ -303,7 +479,7 @@
                                 throwOnError: false
                             });
 
-                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                            scrollToBottom();
                         } catch (e) {
                             console.error("Error parsing chunk:", e, line);
                         }
@@ -317,7 +493,10 @@
                 console.error("Chat error:", error);
                 astContent.innerHTML = `<span class="text-red-500">Error connecting to server or Ollama instance. Check if host is correct.</span>`;
             } finally {
-                sendBtn.disabled = false;
+                sendBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>';
+                sendBtn.disabled = true;
+                sendBtn.classList.add('bg-gptmuted');
+                sendBtn.classList.remove('bg-white', 'text-black');
                 isGenerating = false;
                 messageInput.focus();
             }
@@ -325,6 +504,13 @@
 
         // Initialize
         fetchModels();
+        // Initial disabled state for send button
+        sendBtn.disabled = true;
+
+        // Add padding div at the bottom of the chat container
+        const paddingDiv = document.createElement('div');
+        paddingDiv.className = 'h-32';
+        scrollArea.appendChild(paddingDiv);
     </script>
 </body>
 </html>

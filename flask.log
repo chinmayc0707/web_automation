@@ -1,0 +1,89 @@
+ * Serving Flask app 'app'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.2:5000
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 631-326-424
+127.0.0.1 - - [26/Mar/2026 10:53:35] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Mar/2026 10:53:41] "POST /api/stream HTTP/1.1" 200 -
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm notice
+npm notice New minor version of npm available! 11.11.0 -> 11.12.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.12.0
+npm notice To update run: npm install -g npm@11.12.0
+npm notice
+Exception in thread Thread-4 (runner):
+  + Exception Group Traceback (most recent call last):
+  |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+  |     self.run()
+  |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/threading.py", line 1012, in run
+  |     self._target(*self._args, **self._kwargs)
+  |   File "/app/app.py", line 63, in runner
+  |     asyncio.run(run(prompt, emit=emit))
+  |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/asyncio/runners.py", line 195, in run
+  |     return runner.run(main)
+  |            ^^^^^^^^^^^^^^^^
+  |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/asyncio/runners.py", line 118, in run
+  |     return self._loop.run_until_complete(task)
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+  |     return future.result()
+  |            ^^^^^^^^^^^^^^^
+  |   File "/app/index.py", line 207, in run
+  |     async with connect_mcp(emit=emit) as (session, ollama_tools):
+  |                ^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/app/index.py", line 35, in connect_mcp
+  |     async with stdio_client(server_params) as (read, write):
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/mcp/client/stdio/__init__.py", line 183, in stdio_client
+  |     anyio.create_task_group() as tg,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 799, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Exception Group Traceback (most recent call last):
+    |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/mcp/client/stdio/__init__.py", line 189, in stdio_client
+    |     yield read_stream, write_stream
+    |   File "/app/index.py", line 36, in connect_mcp
+    |     async with ClientSession(read, write) as session:
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/mcp/shared/session.py", line 238, in __aexit__
+    |     return await self._task_group.__aexit__(exc_type, exc_val, exc_tb)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 799, in __aexit__
+    |     raise BaseExceptionGroup(
+    | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+    +-+---------------- 1 ----------------
+      | Traceback (most recent call last):
+      |   File "/app/index.py", line 58, in connect_mcp
+      |     yield session, ollama_tools
+      |   File "/app/index.py", line 214, in run
+      |     steps = planner.plan(prompt, tool_names)
+      |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      |   File "/app/index.py", line 91, in plan
+      |     response = self.client.chat(
+      |                ^^^^^^^^^^^^^^^^^
+      |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/ollama/_client.py", line 365, in chat
+      |     return self._request(
+      |            ^^^^^^^^^^^^^^
+      |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/ollama/_client.py", line 189, in _request
+      |     return cls(**self._request_raw(*args, **kwargs).json())
+      |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      |   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/ollama/_client.py", line 135, in _request_raw
+      |     raise ConnectionError(CONNECTION_ERROR_MESSAGE) from None
+      | ConnectionError: Failed to connect to Ollama. Please check that Ollama is downloaded, running and accessible. https://ollama.com/download
+      +------------------------------------
+127.0.0.1 - - [26/Mar/2026 11:01:10] "GET / HTTP/1.1" 200 -
+ * Detected change in '/app/app.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 631-326-424

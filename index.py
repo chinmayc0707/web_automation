@@ -11,18 +11,18 @@ from ollama import Client
 load_dotenv()
 
 # ── Colors ───────────────────────────────────────────────────────────────────
-GREEN  = '\033[92m'
-YELLOW = '\033[93m'
-RED    = '\033[91m'
-CYAN   = '\033[96m'
-BOLD   = '\033[1m'
-DIM    = '\033[2m'
-RESET  = '\033[0m'
+GREEN  = ''
+YELLOW = ''
+RED    = ''
+CYAN   = ''
+BOLD   = ''
+DIM    = ''
+RESET  = ''
 
 
 # ── MCP Connection ──────────────────────────────────────────────────────────
 @asynccontextmanager
-async def connect_mcp():
+async def connect_mcp(emit=None):
     """Yield (session, ollama_tools) with a persistent Playwright MCP session."""
     npx_cmd = "npx.cmd" if os.name == "nt" else "npx"
     server_params = StdioServerParameters(
@@ -30,11 +30,13 @@ async def connect_mcp():
         args=["-y", "@executeautomation/playwright-mcp-server"],
     )
 
-    print(f"{DIM}Starting Playwright MCP server …{RESET}")
+    if emit:
+        await emit("Starting Playwright MCP server ...")
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            print(f"{GREEN}✓ MCP connected{RESET}\n")
+            if emit:
+                await emit("✓ MCP connected\n")
 
             # Fetch tools and convert to Ollama / OpenAI format
             mcp_tools = (await session.list_tools()).tools
@@ -51,7 +53,8 @@ async def connect_mcp():
                 })
                 tool_names.append(t.name)
 
-            print(f"{DIM}Available tools ({len(tool_names)}): {', '.join(tool_names)}{RESET}\n")
+            if emit:
+                await emit(f"Available tools ({len(tool_names)}): {', '.join(tool_names)}\n")
             yield session, ollama_tools
 
 
@@ -131,6 +134,7 @@ class Executor:
         ollama_tools: list[dict],
         mcp_session: ClientSession,
         context: str = "",
+        emit=None
     ) -> str:
         """Run the tool-call loop for one step. Returns a text summary."""
         messages = [
@@ -161,7 +165,8 @@ class Executor:
                 tool_name = fn["name"]
                 tool_args = fn.get("arguments", {})
 
-                print(f"  {CYAN}🔧 {tool_name}{RESET}({json.dumps(tool_args, indent=2)})")
+                if emit:
+                    await emit(f"  🔧 {tool_name}({json.dumps(tool_args, indent=2)})")
 
                 try:
                     result = await mcp_session.call_tool(tool_name, tool_args)
@@ -177,11 +182,13 @@ class Executor:
                     if len(result_text) > 4000:
                         result_text = result_text[:4000] + "\n... (truncated)"
 
-                    print(f"  {DIM}   ↳ {result_text[:200]}{RESET}")
+                    if emit:
+                        await emit(f"     ↳ {result_text[:200]}")
 
                 except Exception as e:
                     result_text = f"ERROR: {e}"
-                    print(f"  {RED}   ↳ {result_text}{RESET}")
+                    if emit:
+                        await emit(f"     ↳ {result_text}")
 
                 messages.append({
                     "role": "tool",
@@ -192,25 +199,29 @@ class Executor:
 
 
 # ── Orchestrator ────────────────────────────────────────────────────────────
-async def run(prompt: str):
+async def run(prompt: str, emit=None):
     """Main loop: Plan → Execute each step → Print summary."""
     planner = Planner()
     executor = Executor()
 
-    async with connect_mcp() as (session, ollama_tools):
+    async with connect_mcp(emit=emit) as (session, ollama_tools):
         # Extract tool names for the planner
         tool_names = [t["function"]["name"] for t in ollama_tools]
 
         # ── Plan ────────────────────────────────────────────────────────
-        print(f"{BOLD}{YELLOW}📋 Planning …{RESET}")
+        if emit:
+            await emit("📋 Planning ...")
         steps = planner.plan(prompt, tool_names)
 
-        print(f"{BOLD}{GREEN}Plan ({len(steps)} steps):{RESET}")
+        if emit:
+            await emit(f"Plan ({len(steps)} steps):")
         for s in steps:
             step_num = s.get("step", "?")
             action = s.get("action", s.get("summary", str(s)))
-            print(f"  {YELLOW}{step_num}.{RESET} {action}")
-        print()
+            if emit:
+                await emit(f"  {step_num}. {action}")
+        if emit:
+            await emit("")
 
         # ── Execute ─────────────────────────────────────────────────────
         context_lines = []  # cumulative context from prior steps
@@ -221,39 +232,46 @@ async def run(prompt: str):
             action = s.get("action", s.get("summary", str(s)))
             expected = s.get("expected_result", "")
 
-            print(f"{BOLD}{CYAN}▶ Step {step_num}: {action}{RESET}")
+            if emit:
+                await emit(f"▶ Step {step_num}: {action}")
             if expected:
-                print(f"  {DIM}Expected: {expected}{RESET}")
+                if emit:
+                    await emit(f"  Expected: {expected}")
 
             step_prompt = f"Step {step_num}: {action}"
             if expected:
                 step_prompt += f"\nExpected result: {expected}"
 
             context = "\n".join(context_lines[-5:])  # last 5 step summaries
-            summary = await executor.execute(step_prompt, ollama_tools, session, context)
+            summary = await executor.execute(step_prompt, ollama_tools, session, context, emit=emit)
 
-            print(f"  {GREEN}✓ {summary}{RESET}\n")
+            if emit:
+                await emit(f"  ✓ {summary}\n")
 
             context_lines.append(f"Step {step_num}: {action} → {summary}")
             results.append({"step": step_num, "action": action, "result": summary})
 
         # ── Final Summary ───────────────────────────────────────────────
-        print(f"\n{BOLD}{GREEN}{'═' * 60}")
-        print(f"  Task Complete!")
-        print(f"{'═' * 60}{RESET}")
-        for r in results:
-            print(f"  {YELLOW}Step {r['step']}:{RESET} {r['result']}")
-        print()
+        if emit:
+            await emit(f"\n{'=' * 60}")
+            await emit(f"  Task Complete!")
+            await emit(f"{'=' * 60}")
+            for r in results:
+                await emit(f"  Step {r['step']}: {r['result']}")
+            await emit("")
 
 
 # ── Entry Point ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print(f"{BOLD}{GREEN}{'═' * 60}")
-    print(f"  🤖 AI Web Agent (Planner + Executor)")
-    print(f"{'═' * 60}{RESET}\n")
+    async def print_emit(msg):
+        print(msg)
 
-    user_prompt = input(f"{BOLD}Enter your task:{RESET} ").strip()
+    print(f"{'=' * 60}")
+    print(f"  🤖 AI Web Agent (Planner + Executor)")
+    print(f"{'=' * 60}\n")
+
+    user_prompt = input(f"Enter your task: ").strip()
     if not user_prompt:
-        print(f"{RED}No prompt provided. Exiting.{RESET}")
+        print(f"No prompt provided. Exiting.")
     else:
-        asyncio.run(run(user_prompt))
+        asyncio.run(run(user_prompt, emit=print_emit))

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Web Agent</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gptdark: '#343541',
+                        gptdarker: '#202123',
+                        gptgreen: '#10a37f'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #202123;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #565869;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #acacbe;
+        }
+
+        .prose pre {
+            background-color: #000;
+            color: #fff;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+        }
+        .prose code {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+        }
+        .prose pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+    </style>
+</head>
+<body class="bg-gptdark text-gray-100 font-sans h-screen flex flex-col antialiased">
+
+    <!-- Header (Ollama Settings) -->
+    <header class="bg-gptdarker border-b border-gray-700 p-4 flex justify-between items-center shadow-md shrink-0">
+        <h1 class="text-xl font-semibold">AI Web Agent</h1>
+        <div class="flex space-x-4">
+            <div class="flex items-center">
+                <label for="ollamaHost" class="text-sm text-gray-400 mr-2">Ollama Host:</label>
+                <input type="text" id="ollamaHost" value="http://localhost:11434" class="bg-gray-700 text-white text-sm rounded px-2 py-1 border border-gray-600 focus:outline-none focus:border-gray-400 w-48">
+            </div>
+            <div class="flex items-center">
+                <label for="ollamaModel" class="text-sm text-gray-400 mr-2">Model:</label>
+                <input type="text" id="ollamaModel" value="gpt-oss:20b" class="bg-gray-700 text-white text-sm rounded px-2 py-1 border border-gray-600 focus:outline-none focus:border-gray-400 w-32">
+            </div>
+            <button id="saveSettings" class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1 rounded transition">Save</button>
+        </div>
+    </header>
+
+    <!-- Chat Container -->
+    <main id="chat-container" class="flex-1 overflow-y-auto p-4 flex flex-col w-full max-w-4xl mx-auto space-y-6">
+        <!-- Messages will be injected here -->
+        <div class="flex justify-center my-4 text-gray-500 text-sm">Start a conversation with the AI Agent</div>
+    </main>
+
+    <!-- Input Area -->
+    <footer class="bg-gptdark border-t border-transparent p-4 shrink-0 w-full max-w-4xl mx-auto">
+        <div class="relative flex items-center bg-gray-700 rounded-xl shadow-md p-1 border border-gray-600 focus-within:ring-1 focus-within:ring-gray-400">
+            <textarea id="userInput" rows="1" placeholder="Enter your task..." class="w-full bg-transparent text-white resize-none outline-none py-3 px-4 max-h-48 overflow-y-auto"></textarea>
+            <button id="sendBtn" class="absolute right-2 bottom-2 p-2 bg-gptgreen text-white rounded-md hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                </svg>
+            </button>
+        </div>
+        <div class="text-xs text-center text-gray-400 mt-2">
+            Playwright MCP Agent uses Ollama to execute browser tasks.
+        </div>
+    </footer>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const saveSettingsBtn = document.getElementById('saveSettings');
+
+        // Auto-resize textarea
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            if (this.value.trim() === '') {
+                sendBtn.disabled = true;
+            } else {
+                sendBtn.disabled = false;
+            }
+        });
+
+        userInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendBtn.addEventListener('click', sendMessage);
+
+        saveSettingsBtn.addEventListener('click', () => {
+            const host = document.getElementById('ollamaHost').value;
+            const model = document.getElementById('ollamaModel').value;
+            localStorage.setItem('ollamaHost', host);
+            localStorage.setItem('ollamaModel', model);
+
+            // Note: Currently settings are purely visual/localstorage since backend reads from env or localhost directly.
+            // A more complete implementation would send these to backend.
+            alert('Settings saved locally!');
+        });
+
+        // Load settings
+        window.addEventListener('DOMContentLoaded', () => {
+            sendBtn.disabled = true;
+            if (localStorage.getItem('ollamaHost')) {
+                document.getElementById('ollamaHost').value = localStorage.getItem('ollamaHost');
+            }
+            if (localStorage.getItem('ollamaModel')) {
+                document.getElementById('ollamaModel').value = localStorage.getItem('ollamaModel');
+            }
+        });
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g,
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+
+        function renderMath(element) {
+            renderMathInElement(element, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError: false
+            });
+        }
+
+        function createMessageElement(role, initialContent = '') {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'w-full flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'max-w-[85%] rounded-lg px-4 py-3 ';
+
+            if (role === 'user') {
+                // User bubble: ChatGPT green
+                messageDiv.className += 'bg-gptgreen text-white shadow-sm';
+                // User input is just text
+                messageDiv.textContent = initialContent;
+            } else {
+                // AI bubble: GPT dark background
+                messageDiv.className += 'bg-gray-700 text-gray-100 shadow-md prose prose-invert';
+                messageDiv.innerHTML = DOMPurify.sanitize(marked.parse(initialContent));
+                renderMath(messageDiv);
+            }
+
+            wrapper.appendChild(messageDiv);
+            chatContainer.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return messageDiv;
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // Clear input
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            sendBtn.disabled = true;
+
+            // Add user message
+            createMessageElement('user', text);
+
+            // Create placeholder for AI response
+            const aiMessageEl = createMessageElement('assistant', '...');
+
+            try {
+                // Need to use POST to initiate a stream we can read manually
+                // Fetch API is used to stream the response
+                const response = await fetch('/api/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: text })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // AI Response Text Accumulator
+                let accumulatedOutput = "";
+                aiMessageEl.innerHTML = DOMPurify.sanitize(marked.parse(accumulatedOutput));
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+
+                let done = false;
+                while (!done) {
+                    const { value, done: readerDone } = await reader.read();
+                    done = readerDone;
+
+                    if (value) {
+                        const chunk = decoder.decode(value, { stream: true });
+                        // SSE splits events by \n\n
+                        const events = chunk.split('\n\n');
+
+                        for (const event of events) {
+                            if (event.startsWith('data: ')) {
+                                const dataStr = event.substring(6);
+                                try {
+                                    const data = JSON.parse(dataStr);
+                                    if (data.done) {
+                                        break;
+                                    }
+                                    if (data.message) {
+                                        // Terminal output can have newlines. Wrap in code block for better display
+                                        // or just append as text if it's structured
+
+                                        // To handle terminal logs cleanly, let's format it in a code block or standard text
+                                        const cleanMsg = data.message;
+                                        accumulatedOutput += cleanMsg + "\n";
+
+                                        // We parse markdown and sanitize
+                                        // We wrap the terminal logs in a markdown codeblock so it renders nicely
+                                        const mdContent = "```text\n" + accumulatedOutput + "\n```";
+                                        aiMessageEl.innerHTML = DOMPurify.sanitize(marked.parse(mdContent));
+
+                                        renderMath(aiMessageEl);
+                                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                                    }
+                                } catch (e) {
+                                    console.error('Error parsing SSE chunk', e);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                console.error("Fetch error:", error);
+                aiMessageEl.innerHTML = `<div class="text-red-400">Error: ${escapeHTML(error.message)}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
